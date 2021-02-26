@@ -1,0 +1,43 @@
+mkdir -p  /tmp/scripts/${ORACLE_SID}
+cat > /tmp/scripts/${ORACLE_SID}/${ORACLE_SID}_del_arch.sh
+#!/usr/bin/sh
+export ORACLE_BASE=/u01/app/oracle
+export ORACLE_HOME=${ORACLE_BASE}/product/11.2.0/db_2
+##export ORA_CRS_HOME=${ORACLE_BASE}/product/10.2/crs
+export ORACLE_SID=PROD
+export LD_LIBRARY_PATH=${ORACLE_HOME}/lib
+export TNS_ADMIN=${ORACLE_HOME}/network/admin
+export PATH=$PATH:${ORACLE_HOME}/bin:${ORACLE_HOME}/OPatch:${ORA_CRS_HOME}/bin
+CLASSPATH=${ORACLE_HOME}/jlib:${ORACLE_HOME}/OPatch/jlib
+SCRIPT_PATH=/tmp/scripts/${ORACLE_SID}       ##路径修改
+
+
+cd $SCRIPT_PATH   
+
+filepath1=`dirname $0`
+filepath=`cd $filepath1; pwd`
+mkdir -p ${filepath}/${ORACLE_SID}_log/
+LOG=${filepath}/${ORACLE_SID}_log/del_arch_`date +%Y%m%d_%H.%M.%S`
+
+
+
+del_archive_log()
+{
+$ORACLE_HOME/bin/rman target / >>${LOG}.log<<EOF2
+RUN { SQL "ALTER SESSION SET NLS_DATE_FORMAT=''YYYY-MM-DD HH24:MI:SS''";}
+delete noprompt force archivelog all  completed before 'sysdate-7'; 
+CROSSCHECK ARCHIVELOG ALL;
+DELETE NOPROMPT EXPIRED ARCHIVELOG ALL;
+EOF2
+}
+
+del_archive_log;
+
+
+if [ `grep -c "ORA-" ${LOG}.log` -gt 0 ] ;then
+  exit 1
+fi
+
+
+cd ${filepath}/${ORACLE_SID}_log
+find . -name "del*.log" -mtime +2 -exec rm -f {} \;
